@@ -4,6 +4,8 @@
 
 Save captures into the review directory (`<review-dir>/shots/`), never into the user's project.
 
+Tools used below, and how to get them on Debian/Ubuntu: `xvfb-run` (`apt-get install xvfb`), `import` (`apt-get install imagemagick`), `xdotool` (`apt-get install xdotool`). Check with `which <tool>` first. The same install rule as `capture_web.py` applies: install freely in a sandbox, ask first on the user's own machine, and fall back to a code-only review if you can't.
+
 ## Tkinter
 
 **Linux / headless** (no display): run under a virtual display and grab the root window.

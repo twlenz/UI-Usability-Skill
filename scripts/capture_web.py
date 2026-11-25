@@ -9,6 +9,7 @@ Usage:
   python capture_web.py http://localhost:8501 --out shots \
       --serve "streamlit run app.py --server.headless true --server.port 8501" --wait 4000
   python capture_web.py index.html --out shots --steps steps.json
+  python capture_web.py --check      # are Playwright + Chromium installed? (exit 3 if not)
 
 steps.json (optional) walks through a task and screenshots after every step:
   [
@@ -45,7 +46,51 @@ import time
 import urllib.request
 from pathlib import Path
 
-from playwright.sync_api import sync_playwright
+INSTALL_HELP = """\
+Install (one time):
+  pip install playwright             (add --break-system-packages if pip refuses)
+  python -m playwright install chromium
+On Linux, if Chromium then fails to start because of missing system libraries:
+  python -m playwright install --with-deps chromium   (needs root/sudo)
+If you can't install packages in this environment, skip screenshots and do a
+code-only review instead (SKILL.md, step 3), and say so in the report."""
+
+# Exit code 3 = missing dependency, so callers can tell it apart from a page error.
+EXIT_MISSING_DEP = 3
+
+
+def missing_dependency(what):
+    sys.stderr.write(f"capture_web.py: {what}\n\n{INSTALL_HELP}\n")
+    sys.exit(EXIT_MISSING_DEP)
+
+
+try:
+    from playwright.sync_api import sync_playwright, Error as PlaywrightError
+except ImportError:
+    sync_playwright = None
+    PlaywrightError = Exception
+
+
+def launch_chromium(p):
+    """Start headless Chromium, turning Playwright's long launch errors into short install advice."""
+    try:
+        return p.chromium.launch()
+    except PlaywrightError as e:
+        msg = str(e)
+        if "Executable doesn't exist" in msg or "playwright install" in msg:
+            missing_dependency("Playwright is installed but its Chromium browser isn't.")
+        if "error while loading shared libraries" in msg or "missing dependencies" in msg.lower():
+            missing_dependency("Chromium is installed but can't start: system libraries are missing.")
+        raise
+
+
+def check_dependencies():
+    """--check: confirm Playwright and Chromium work, without capturing anything."""
+    if sync_playwright is None:
+        missing_dependency("the Python package 'playwright' isn't installed.")
+    with sync_playwright() as p:
+        launch_chromium(p).close()
+    print("capture_web.py: dependencies OK (Playwright + Chromium)")
 
 AUDIT_JS = r"""
 (opts) => {
@@ -333,8 +378,10 @@ def walk_steps(page, steps, out, prefix, full_page, touch, report):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("target", help="Path to .html file or URL")
-    ap.add_argument("--out", required=True, help="Output directory")
+    ap.add_argument("target", nargs="?", help="Path to .html file or URL")
+    ap.add_argument("--check", action="store_true",
+                    help="Only check that Playwright and Chromium are installed, then exit (code 3 if not)")
+    ap.add_argument("--out", help="Output directory (required unless --check)")
     ap.add_argument("--viewports", default="1440x900", help="Desktop viewports, comma list of WxH (default 1440x900)")
     ap.add_argument("--mobile-device", default="iPhone 13",
                     help='Playwright device to emulate for the mobile pass (e.g. "iPhone 13", "Pixel 7", "iPad (gen 7)")')
@@ -350,6 +397,14 @@ def main():
                     help="Viewport height in px for every view. Use for apps that scroll inside their own "
                          "container (Streamlit, many SPAs), where full-page screenshots get cut at the window height")
     args = ap.parse_args()
+
+    if args.check:
+        check_dependencies()
+        return
+    if not args.target or not args.out:
+        ap.error("target and --out are required (or use --check)")
+    if sync_playwright is None:
+        missing_dependency("the Python package 'playwright' isn't installed.")
 
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -367,7 +422,7 @@ def main():
     report = {"target": args.target, "views": {}, "steps": {}, "console_errors": []}
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch()
+            browser = launch_chromium(p)
             views = []
             for i, v in enumerate(args.viewports.split(",")):
                 w, h = map(int, v.lower().split("x"))

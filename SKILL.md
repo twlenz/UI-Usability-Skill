@@ -17,6 +17,21 @@ Claude-built interfaces tend to fail in three predictable ways: **unclear contro
 
 1. Brief → 2. Build → 3. Capture → 4. Evaluate (independent) → 5. Revise → 6. Report
 
+For the full workflow, copy this checklist into your task list (a todo tool if you have one) and tick items off as you go. Steps are easiest to skip when a run is long, and the skipped ones (end screens, the independent evaluator) are often where problems hide.
+
+```
+- [ ] Brief: ui-brief.md with users, devices, 1–3 top tasks (step by step), primary action per screen
+- [ ] Design tokens defined before the second screen
+- [ ] Built: verb + object labels, one primary action per screen, text within budget
+- [ ] Capture tools checked (capture_web.py --check), or code-only review chosen and noted
+- [ ] Screenshots of every state: first view, populated, error, empty, and any start or end screen
+- [ ] Mobile pass done (or skipped because the UI can't run on mobile); steps file for top task 1
+- [ ] Fresh evaluator subagent spawned with paths only (or self-review fallback, noted in report)
+- [ ] Every severity 3–4 finding fixed through the design system; word count not increased
+- [ ] Re-captured and re-checked (max 2 rounds)
+- [ ] Short report: fixed, remaining, assumptions, code-only if so
+```
+
 Keep review artifacts (brief, screenshots, findings) in a scratch directory outside the user's project, e.g. `/tmp/ui-review-<project>/`, so the repo isn't cluttered. Keep them only if the user asks.
 
 ### 1. Write a UI brief before writing code
@@ -72,8 +87,10 @@ Render the UI and take screenshots. Layout drift, buried controls and text overl
 
 - **Anything a browser can load** (HTML, React/Vite, Streamlit, Dash, Gradio, Shiny, Flask): run `scripts/capture_web.py` from this skill's folder.
   ```bash
+  python <skill-dir>/scripts/capture_web.py --check        # Playwright + Chromium present?
   python <skill-dir>/scripts/capture_web.py <file-or-url> --out <review-dir>/shots
   ```
+  The script needs Playwright and its Chromium build. If `--check` exits with code 3, it prints the install commands (`pip install playwright`, then `python -m playwright install chromium`). In a sandbox or cloud workspace, run them. On the user's own machine, ask before installing, and install into a virtual environment if the project uses one. If installing isn't possible, do the code-only review described below.
   It screenshots a desktop viewport, then loads the page again in real mobile emulation (touch input, no hover, mobile browser identity, phone pixel density), not just a narrow window. That's what reveals hover-only controls, missing viewport settings and touch-target problems. It writes `audit.json`: visible word counts and longest text blocks, unlabeled and icon-only controls, placeholder-only fields, small targets (24 px desktop, 44 px touch), low-contrast text, the number of distinct font sizes and button styles, horizontal overflow, console errors, and, for mobile, hover-only reveal rules, a missing viewport tag and form fields that make iOS zoom.
   - `--serve "<cmd>"` starts a dev server first. Use `--wait 4000` for Streamlit or React.
   - `--steps steps.json` clicks through a top task and screenshots each step (taps in mobile mode). These step screenshots are the cognitive walkthrough's raw material, so write a steps file for at least the first top task.
@@ -87,7 +104,7 @@ Render the UI and take screenshots. Layout drift, buried controls and text overl
 
 Spawn a subagent whose instructions are `references/evaluator-brief.md`. Pass it the paths to `ui-brief.md`, the screenshot directory, `audit.json` and the source files, and tell it where the reference files are. Don't pass your design rationale and don't ask it to confirm the design works. The value comes from a reviewer who knows only what a user would know plus the intended tasks, the same reason heuristic evaluations use evaluators who didn't build the system.
 
-The evaluator runs a cognitive walkthrough of each top task and a heuristic sweep (Nielsen's 10, Tognazzini's principles, a visual-hierarchy squint test, and for web UIs the Vercel guidelines). It checks the UI against the brief's users, tasks and primary actions. It doesn't see your reasons for design choices, so it can't check whether the build matches them. It writes `findings.md`, where each finding has evidence, a 0–4 severity and a specific fix.
+The evaluator runs a cognitive walkthrough of each top task and a heuristic sweep (Nielsen's 10, Tognazzini's principles, a visual-hierarchy squint test, and for web UIs the Vercel guidelines). It checks the UI against the brief's users, tasks and primary actions. It doesn't see your reasons for design choices, so it can't check whether the build matches them. It returns its findings as its reply: each finding has evidence, a 0–4 severity and a specific fix. Save that reply as `findings.md` in the review directory. (Subagents are often told not to write report files, so the evaluator doesn't write it.) For a re-check, append the reply to `findings.md`.
 
 If no subagent tool is available, do the evaluation yourself as a separate pass. Re-read only the brief, the screenshots and `audit.json`, follow the evaluator brief, and hunt for problems in your own work. Expect to be lenient toward it, and compensate.
 

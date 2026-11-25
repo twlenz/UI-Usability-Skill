@@ -39,7 +39,7 @@ These rules exist because evaluator models tend to produce two kinds of bad outp
 
 ## Output
 
-Write `findings.md` in the screenshots directory's parent folder:
+Return your findings as your final reply, in the format below. Don't write a file: the caller saves your reply as `findings.md`. (Subagents are often told not to write report files, and the format works the same either way.)
 
 ```markdown
 # Findings: <UI name>
@@ -65,8 +65,8 @@ Write `findings.md` in the screenshots directory's parent folder:
 
 Order findings by severity, highest first. Merge duplicates (the same root cause on several screens is one finding with several locations). Aim for the problems that matter. A dozen sharp findings are worth more than forty trivial ones; group severity-1 nitpicks into a single line if there are many.
 
-Finally, reply to the caller with: the path to `findings.md`, the count of findings by severity, and walkthrough pass/fail per task. Keep it to three lines.
+Start the reply with three summary lines: the count of findings by severity, walkthrough pass/fail per task, and anything you couldn't assess. Then give the full findings in the format above.
 
 ## On re-check rounds
 
-If the caller asks you to re-check after a revision, look at the new screenshots for (a) each previously reported severity 3–4 finding, marking it fixed, partly fixed, or not fixed, and (b) any new problem the fix introduced, especially new text, new inconsistency, or broken items from the "Keep" list. Append a "Re-check" section to `findings.md` rather than rewriting it.
+If the caller asks you to re-check after a revision, look at the new screenshots for (a) each previously reported severity 3–4 finding, marking it fixed, partly fixed, or not fixed, and (b) any new problem the fix introduced, especially new text, new inconsistency, or broken items from the "Keep" list. Reply with only a "Re-check" section (the caller appends it to `findings.md`); don't repeat the original findings.
